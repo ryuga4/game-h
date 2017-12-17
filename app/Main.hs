@@ -53,14 +53,14 @@ moveSnake model@Model { .. } = model { snake = newSnake
                                      , snakeLength = newSnakeLength
                                      , apples = newApples
                                      }
-  where (V2 x y) = head snake
-        newHead DLeft  = V2 (x-10) y
-        newHead DRight = V2 (x+10) y
-        newHead DUp    = V2 x (y-10)
-        newHead DDown  = V2 x (y+10)
+  where
+        newHead DLeft  = head snake - V2 10 0
+        newHead DRight = head snake + V2 10 0
+        newHead DUp    = head snake - V2 0 10
+        newHead DDown  = head snake + V2 0 10
         appleHit = head snake `elem` apples
         newSnake = take snakeLength $ newHead direction : snake
-        (newApples, newSnakeLength)  | appleHit = (filter (V2 x y /=) apples, snakeLength + 1)
+        (newApples, newSnakeLength)  | appleHit = (filter (head snake /=) apples, snakeLength + 1)
                                      | otherwise = (apples, snakeLength)
 
 
