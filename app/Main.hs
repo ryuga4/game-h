@@ -23,7 +23,16 @@ data Action = Idle
             | ChangeDirection Direction
             | Move Double
             | SpawnApple Double
+            | ToggleState
+data PlayerState = Playing
+                 | Pause
+                 | Dead
+                 deriving (Eq)
 
+toggleState :: PlayerState -> PlayerState
+toggleState Playing = Pause
+toggleState Pause   = Playing
+toggleState Dead    = Playing
 
 data Model = Model
   { cursorPos   :: V2 Double
@@ -32,6 +41,7 @@ data Model = Model
   , snakeLength :: SnakeSize
   , apples      :: [V2 Int]
   , randGen     :: StdGen
+  , playerState :: PlayerState
   }
 
 data Direction = DLeft | DRight | DUp | DDown
@@ -52,6 +62,7 @@ moveSnake model@Model {snake=[]} = model
 moveSnake model@Model { .. } = model { snake = newSnake
                                      , snakeLength = newSnakeLength
                                      , apples = newApples
+                                     , playerState = newPlayerState
                                      }
   where
         newHead DLeft  = head snake - V2 10 0
@@ -59,6 +70,9 @@ moveSnake model@Model { .. } = model { snake = newSnake
         newHead DUp    = head snake - V2 0 10
         newHead DDown  = head snake + V2 0 10
         appleHit = head snake `elem` apples
+        snakeHit = head snake `elem` tail snake
+        newPlayerState | snakeHit  = Dead
+                       | otherwise = playerState 
         newSnake = take snakeLength $ newHead direction : snake
         (newApples, newSnakeLength)  | appleHit = (filter (head snake /=) apples, snakeLength + 1)
                                      | otherwise = (apples, snakeLength)
@@ -73,24 +87,31 @@ initial gen = (model, Cmd.none)
           , snakeLength = 20
           , apples = []
           , randGen = gen
+          , playerState = Playing
           }
 
 update :: Model -> Action -> (Model, Cmd SDLEngine Action)
 update model Idle = (model, Cmd.none)
 update model (ChangePosition pos) = (model {cursorPos = pos}, Cmd.none)
 update model@Model{..} (ChangeDirection newDirection) =
-  if direction /= newDirection
+  if direction /= oposite newDirection
   then (model {direction = newDirection}, Cmd.none)
   else (model, Cmd.none)
-update model (Move _) = (moveSnake model, Cmd.none)
-update model (SpawnApple _) = (model { apples = newApple : apples model
+update model (Move _) | playerState model == Playing = (moveSnake model, Cmd.none)
+                      | otherwise = (model, Cmd.none)
+update model (SpawnApple _) | playerState model == Playing =
+                              (model { apples = newApple : apples model
                                      , randGen = gen2
                                      }, Cmd.none)
+                            | otherwise = (model, Cmd.none)
   where (rand1, gen1) = next $ randGen model
         (rand2, gen2) = next gen1
         x = rand1 `mod` 60 * 10 + 5
         y = rand2 `mod` 60 * 10 + 5
         newApple = V2 x y
+update model ToggleState | playerState model == Dead = initial $ randGen model
+                         | otherwise = (model {playerState = toggleState $ playerState model}, Cmd.none)
+
 
 subscriptions :: Sub SDLEngine Action
 subscriptions = Sub.batch
@@ -100,6 +121,7 @@ subscriptions = Sub.batch
                          Keyboard.DownKey -> ChangeDirection DDown
                          Keyboard.LeftKey -> ChangeDirection DLeft
                          Keyboard.RightKey -> ChangeDirection DRight
+                         Keyboard.SpaceKey -> ToggleState
                          _ -> Idle
                      )
   , Time.fps 20 Move
@@ -107,7 +129,12 @@ subscriptions = Sub.batch
   ]
 
 view :: Model -> Graphics SDLEngine
-view Model { .. } = Graphics2D $ collage $ a ++ s
+view Model { .. } | playerState == Dead = Graphics2D $ collage
+                                          [move (V2 400 400)
+                                           $ filled (rgb 1 1 1)
+                                           $ square 100]
+
+                  | otherwise = Graphics2D $ collage $ a ++ s
   where s = map (\i -> move (fmap fromIntegral i) $ filled (rgb 0 1 0) $ square 10) snake
         a = map (\i -> move (fmap fromIntegral i) $ filled (rgb 1 0 0) $ circle 5) apples
 
@@ -118,7 +145,7 @@ main = do
     { SDL.windowDimensions = V2 600 600
     , SDL.windowIsResizable = False
     }
-    
+
   run engine GameConfig
     { initialFn       = initial rand
     , updateFn        = update
