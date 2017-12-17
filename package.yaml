@@ -31,10 +31,13 @@ executables:
   game-h-exe:
     main:                Main.hs
     source-dirs:         app
+  #  ld-options:
+   # - -static
     ghc-options:
     - -threaded
     - -rtsopts
     - -with-rtsopts=-N
+    - -O2
     dependencies:
     - game-h
 

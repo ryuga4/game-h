@@ -1,22 +1,22 @@
+{-# LANGUAGE LambdaCase      #-}
 {-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE LambdaCase #-}
 
 module Main where
 
-import Linear.V2 (V2(V2))
+import           Linear.V2       (V2 (V2))
 
-import Helm
-import Helm.Color
-import Helm.Engine.SDL
-import Helm.Graphics2D
+import           Helm
+import           Helm.Color
+import           Helm.Engine.SDL
+import           Helm.Graphics2D
 
-import qualified Helm.Cmd as Cmd
-import qualified Helm.Mouse as Mouse
-import qualified Helm.Keyboard as Keyboard
+import qualified Helm.Cmd        as Cmd
 import qualified Helm.Engine.SDL as SDL
-import qualified Helm.Sub as Sub
-import qualified Helm.Time as Time
-import System.Random
+import qualified Helm.Keyboard   as Keyboard
+import qualified Helm.Mouse      as Mouse
+import qualified Helm.Sub        as Sub
+import qualified Helm.Time       as Time
+import           System.Random
 
 data Action = Idle
             | ChangePosition (V2 Double)
@@ -26,34 +26,42 @@ data Action = Idle
 
 
 data Model = Model
-  { cursorPos :: V2 Double
-  , direction :: Direction
-  , snake :: Snake
+  { cursorPos   :: V2 Double
+  , direction   :: Direction
+  , snake       :: Snake
   , snakeLength :: SnakeSize
-  , apples :: [V2 Int]
-  , randGen :: StdGen
+  , apples      :: [V2 Int]
+  , randGen     :: StdGen
   }
 
 data Direction = DLeft | DRight | DUp | DDown
+  deriving (Eq)
+
+oposite :: Direction -> Direction
+oposite DLeft  = DRight
+oposite DRight = DLeft
+oposite DUp    = DDown
+oposite DDown  = DUp
+
 type Snake = [V2 Int]
 type SnakeSize = Int
 
 
 moveSnake :: Model -> Model
 moveSnake model@Model {snake=[]} = model
-moveSnake model@Model { direction = d
-                       , snake = s@(V2 x y : _)
-                       , snakeLength = n
-                       , apples = a
-                       } = model { snake = take n $ newHead d : s
-                                                 , snakeLength = if appleHit then n+1 else n
-                                                 , apples = filter (V2 x y /=) a
-                                                 }
-  where newHead DLeft  = V2 (x-10) y
+moveSnake model@Model { .. } = model { snake = newSnake
+                                     , snakeLength = newSnakeLength
+                                     , apples = newApples
+                                     }
+  where (V2 x y) = head snake
+        newHead DLeft  = V2 (x-10) y
         newHead DRight = V2 (x+10) y
         newHead DUp    = V2 x (y-10)
         newHead DDown  = V2 x (y+10)
-        appleHit = V2 x y `elem` a
+        appleHit = head snake `elem` apples
+        newSnake = take snakeLength $ newHead direction : snake
+        (newApples, newSnakeLength)  | appleHit = (filter (V2 x y /=) apples, snakeLength + 1)
+                                     | otherwise = (apples, snakeLength)
 
 
 initial :: StdGen -> (Model, Cmd SDLEngine Action)
@@ -70,7 +78,10 @@ initial gen = (model, Cmd.none)
 update :: Model -> Action -> (Model, Cmd SDLEngine Action)
 update model Idle = (model, Cmd.none)
 update model (ChangePosition pos) = (model {cursorPos = pos}, Cmd.none)
-update model (ChangeDirection direction) = (model {direction = direction}, Cmd.none)
+update model@Model{..} (ChangeDirection newDirection) =
+  if direction /= newDirection
+  then (model {direction = newDirection}, Cmd.none)
+  else (model, Cmd.none)
 update model (Move _) = (moveSnake model, Cmd.none)
 update model (SpawnApple _) = (model { apples = newApple : apples model
                                      , randGen = gen2
@@ -94,6 +105,7 @@ subscriptions = Sub.batch
   , Time.fps 20 Move
   , Time.every (Time.second * 2) SpawnApple
   ]
+
 view :: Model -> Graphics SDLEngine
 view Model { .. } = Graphics2D $ collage $ a ++ s
   where s = map (\i -> move (fmap fromIntegral i) $ filled (rgb 0 1 0) $ square 10) snake
@@ -103,10 +115,10 @@ main :: IO ()
 main = do
   rand <- getStdGen
   engine <- SDL.startupWith $ SDL.defaultConfig
-
     { SDL.windowDimensions = V2 600 600
     , SDL.windowIsResizable = False
     }
+    
   run engine GameConfig
     { initialFn       = initial rand
     , updateFn        = update
