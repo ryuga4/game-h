@@ -82,7 +82,7 @@ view Model { .. } = Graphics2D $ collage $ s
 main :: IO ()
 main = do
   engine <- SDL.startupWith $ SDL.defaultConfig
-    { SDL.windowDimensions = V2 800 800
+    { SDL.windowDimensions = V2 600 600
     , SDL.windowIsResizable = False
     }
   run engine GameConfig
