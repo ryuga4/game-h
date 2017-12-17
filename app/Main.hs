@@ -16,7 +16,7 @@ import qualified Helm.Keyboard as Keyboard
 import qualified Helm.Engine.SDL as SDL
 import qualified Helm.Sub as Sub
 import qualified Helm.Time as Time
-import           Helm.Time (Time, second)
+
 
 data Action = Idle
             | ChangePosition (V2 Double)
@@ -76,7 +76,7 @@ subscriptions = Sub.batch
   , Time.fps 20 Move
   ]
 view :: Model -> Graphics SDLEngine
-view Model { .. } = Graphics2D $ collage $ s
+view Model { .. } = Graphics2D $ collage s
   where s = map (\i -> move i $ filled (rgb 0 1 1) $ square 10) snake
 
 main :: IO ()
