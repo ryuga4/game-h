@@ -30,13 +30,14 @@ data PlayerState = Playing
                  deriving (Eq)
 
 data Model = Model
-  { cursorPos   :: V2 Double
-  , direction   :: Direction
-  , snake       :: Snake
-  , snakeLength :: SnakeSize
-  , apples      :: [V2 Int]
-  , randGen     :: StdGen
-  , playerState :: PlayerState
+  { cursorPos     :: V2 Double
+  , direction     :: Direction
+  , nextDirection :: Direction
+  , snake         :: Snake
+  , snakeLength   :: SnakeSize
+  , apples        :: [V2 Int]
+  , randGen       :: StdGen
+  , playerState   :: PlayerState
   }
 
 
@@ -51,6 +52,7 @@ initial gen = (model, Cmd.none)
   where model = Model
           { cursorPos = V2 0 0
           , direction = DLeft
+          , nextDirection = DLeft
           , snake = [V2 405 405]
           , snakeLength = 20
           , apples = []
@@ -76,13 +78,14 @@ moveSnake model@Model { .. } = model { snake = newSnake
                                      , snakeLength = newSnakeLength
                                      , apples = newApples
                                      , playerState = newPlayerState
+                                     , direction = nextDirection
                                      }
   where
         directionVec DLeft  = V2 (-10) 0
         directionVec DRight = V2 10 0
         directionVec DUp    = V2 0 (-10)
         directionVec DDown  = V2 0 10
-        newHead = (`mod` 600) <$> head snake + directionVec direction
+        newHead = (`mod` 600) <$> head snake + directionVec nextDirection
         appleHit = head snake `elem` apples
         snakeHit = head snake `elem` tail snake
         newPlayerState | snakeHit  = Dead
@@ -98,7 +101,7 @@ update model Idle = (model, Cmd.none)
 update model (ChangePosition pos) = (model {cursorPos = pos}, Cmd.none)
 update model@Model{..} (ChangeDirection newDirection) =
   if direction /= oposite newDirection
-  then (model {direction = newDirection}, Cmd.none)
+  then (model {nextDirection = newDirection}, Cmd.none)
   else (model, Cmd.none)
 update model (Move _) | playerState model == Playing = (moveSnake model, Cmd.none)
                       | otherwise = (model, Cmd.none)
