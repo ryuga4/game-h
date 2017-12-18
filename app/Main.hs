@@ -29,11 +29,6 @@ data PlayerState = Playing
                  | Dead
                  deriving (Eq)
 
-toggleState :: PlayerState -> PlayerState
-toggleState Playing = Pause
-toggleState Pause   = Playing
-toggleState Dead    = Playing
-
 data Model = Model
   { cursorPos   :: V2 Double
   , direction   :: Direction
@@ -44,39 +39,12 @@ data Model = Model
   , playerState :: PlayerState
   }
 
+
 data Direction = DLeft | DRight | DUp | DDown
   deriving (Eq)
 
-oposite :: Direction -> Direction
-oposite DLeft  = DRight
-oposite DRight = DLeft
-oposite DUp    = DDown
-oposite DDown  = DUp
-
 type Snake = [V2 Int]
 type SnakeSize = Int
-
-
-moveSnake :: Model -> Model
-moveSnake model@Model {snake=[]} = model
-moveSnake model@Model { .. } = model { snake = newSnake
-                                     , snakeLength = newSnakeLength
-                                     , apples = newApples
-                                     , playerState = newPlayerState
-                                     }
-  where
-        newHead DLeft  = head snake - V2 10 0
-        newHead DRight = head snake + V2 10 0
-        newHead DUp    = head snake - V2 0 10
-        newHead DDown  = head snake + V2 0 10
-        appleHit = head snake `elem` apples
-        snakeHit = head snake `elem` tail snake
-        newPlayerState | snakeHit  = Dead
-                       | otherwise = playerState 
-        newSnake = take snakeLength $ newHead direction : snake
-        (newApples, newSnakeLength)  | appleHit = (filter (head snake /=) apples, snakeLength + 1)
-                                     | otherwise = (apples, snakeLength)
-
 
 initial :: StdGen -> (Model, Cmd SDLEngine Action)
 initial gen = (model, Cmd.none)
@@ -89,6 +57,41 @@ initial gen = (model, Cmd.none)
           , randGen = gen
           , playerState = Playing
           }
+
+
+oposite :: Direction -> Direction
+oposite DLeft  = DRight
+oposite DRight = DLeft
+oposite DUp    = DDown
+oposite DDown  = DUp
+
+toggleState :: PlayerState -> PlayerState
+toggleState Playing = Pause
+toggleState Pause   = Playing
+toggleState Dead    = Playing
+
+moveSnake :: Model -> Model
+moveSnake model@Model {snake=[]} = model
+moveSnake model@Model { .. } = model { snake = newSnake
+                                     , snakeLength = newSnakeLength
+                                     , apples = newApples
+                                     , playerState = newPlayerState
+                                     }
+  where
+        directionVec DLeft  = V2 (-10) 0
+        directionVec DRight = V2 10 0
+        directionVec DUp    = V2 0 (-10)
+        directionVec DDown  = V2 0 10
+        newHead = (`mod` 600) <$> head snake + directionVec direction
+        appleHit = head snake `elem` apples
+        snakeHit = head snake `elem` tail snake
+        newPlayerState | snakeHit  = Dead
+                       | otherwise = playerState
+        newSnake = take snakeLength $ newHead : snake
+        (newApples, newSnakeLength)  | appleHit = (filter (head snake /=) apples, snakeLength + 1)
+                                     | otherwise = (apples, snakeLength)
+
+
 
 update :: Model -> Action -> (Model, Cmd SDLEngine Action)
 update model Idle = (model, Cmd.none)
@@ -135,7 +138,10 @@ view Model { .. } | playerState == Dead = Graphics2D $ collage
                                            $ square 100]
 
                   | otherwise = Graphics2D $ collage $ a ++ s
-  where s = map (\i -> move (fmap fromIntegral i) $ filled (rgb 0 1 0) $ square 10) snake
+  where s = snake >>= \i -> map (move (fmap fromIntegral i))
+                                  [ filled (rgb 0 0.5 0) $ square 10
+                                  , outlined (solid (rgb 0.6 0.8 0)) $ square 10
+                                  ]
         a = map (\i -> move (fmap fromIntegral i) $ filled (rgb 1 0 0) $ circle 5) apples
 
 main :: IO ()
