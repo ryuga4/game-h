@@ -91,7 +91,7 @@ moveSnake model@Model { .. } = model { snake = newSnake
         newPlayerState | snakeHit  = Dead
                        | otherwise = playerState
         newSnake = take snakeLength $ newHead : snake
-        (newApples, newSnakeLength)  | appleHit = (filter (head snake /=) apples, snakeLength + 1)
+        (newApples, newSnakeLength)  | appleHit = (filter (head snake /=) apples, snakeLength + 5)
                                      | otherwise = (apples, snakeLength)
 
 
