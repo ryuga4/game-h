@@ -10,12 +10,15 @@ import           Helm.Color
 import           Helm.Engine.SDL
 import           Helm.Graphics2D
 
+import           Data.Maybe
+import           Debug.Trace
 import qualified Helm.Cmd        as Cmd
 import qualified Helm.Engine.SDL as SDL
 import qualified Helm.Keyboard   as Keyboard
 import qualified Helm.Mouse      as Mouse
 import qualified Helm.Sub        as Sub
 import qualified Helm.Time       as Time
+import           Lib             as Lib
 import           System.Random
 
 data Action = Idle
@@ -30,19 +33,20 @@ data PlayerState = Playing
                  deriving (Eq)
 
 data Model = Model
-  { cursorPos     :: V2 Double
-  , direction     :: Direction
-  , nextDirection :: Direction
-  , snake         :: Snake
-  , snakeLength   :: SnakeSize
-  , apples        :: [V2 Int]
-  , randGen       :: StdGen
-  , playerState   :: PlayerState
+  { cursorPos      :: V2 Double
+  , directionQueue :: Queue Direction
+  , direction      :: Direction
+  , nextDirection  :: Direction
+  , snake          :: Snake
+  , snakeLength    :: SnakeSize
+  , apples         :: [V2 Int]
+  , randGen        :: StdGen
+  , playerState    :: PlayerState
   }
 
 
 data Direction = DLeft | DRight | DUp | DDown
-  deriving (Eq)
+  deriving (Eq, Show)
 
 type Snake = [V2 Int]
 type SnakeSize = Int
@@ -51,6 +55,7 @@ initial :: StdGen -> (Model, Cmd SDLEngine Action)
 initial gen = (model, Cmd.none)
   where model = Model
           { cursorPos = V2 0 0
+          , directionQueue = Queue [] []
           , direction = DLeft
           , nextDirection = DLeft
           , snake = [V2 405 405]
@@ -73,36 +78,39 @@ toggleState Pause   = Playing
 toggleState Dead    = Playing
 
 moveSnake :: Model -> Model
+moveSnake Model { .. } | trace (show directionQueue) False = undefined
 moveSnake model@Model {snake=[]} = model
 moveSnake model@Model { .. } = model { snake = newSnake
                                      , snakeLength = newSnakeLength
                                      , apples = newApples
                                      , playerState = newPlayerState
-                                     , direction = nextDirection
+                                     , direction = newDirection
+                                     , directionQueue = pop newDirectionQueue
                                      }
   where
+        newDirectionQueue = popWhile (== oposite direction) directionQueue
+        newDirection = fromMaybe direction $ front newDirectionQueue
+
         directionVec DLeft  = V2 (-10) 0
         directionVec DRight = V2 10 0
         directionVec DUp    = V2 0 (-10)
         directionVec DDown  = V2 0 10
-        newHead = (`mod` 600) <$> head snake + directionVec nextDirection
+        newHead = (`mod` 600) <$> head snake + directionVec newDirection
+
         appleHit = head snake `elem` apples
         snakeHit = head snake `elem` tail snake
+
         newPlayerState | snakeHit  = Dead
                        | otherwise = playerState
+
         newSnake = take snakeLength $ newHead : snake
         (newApples, newSnakeLength)  | appleHit = (filter (head snake /=) apples, snakeLength + 5)
                                      | otherwise = (apples, snakeLength)
-
-
-
 update :: Model -> Action -> (Model, Cmd SDLEngine Action)
 update model Idle = (model, Cmd.none)
 update model (ChangePosition pos) = (model {cursorPos = pos}, Cmd.none)
-update model@Model{..} (ChangeDirection newDirection) =
-  if direction /= oposite newDirection
-  then (model {nextDirection = newDirection}, Cmd.none)
-  else (model, Cmd.none)
+update model@Model{..} (ChangeDirection newDirection) = (model {directionQueue = newQueue}, Cmd.none)
+  where newQueue = push newDirection directionQueue
 update model (Move _) | playerState model == Playing = (moveSnake model, Cmd.none)
                       | otherwise = (model, Cmd.none)
 update model (SpawnApple _) | playerState model == Playing =
@@ -130,7 +138,7 @@ subscriptions = Sub.batch
                          Keyboard.SpaceKey -> ToggleState
                          _ -> Idle
                      )
-  , Time.fps 20 Move
+  , Time.fps 15 Move
   , Time.every (Time.second * 2) SpawnApple
   ]
 
