@@ -30,4 +30,4 @@ popWhile f q = case front q of
                  Nothing -> Queue [] []
                  Just x -> if f x
                               then popWhile f $ pop q
-                              else q3
+                              else q
