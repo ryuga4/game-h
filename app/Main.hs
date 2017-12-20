@@ -54,13 +54,13 @@ type SnakeSize = Int
 windowSize :: Int
 windowSize = 600
 framesNumber :: Int
-framesNumber = 20
+framesNumber = 40
 fps :: Int
 fps = 5
 segSize :: Int
 segSize = windowSize `div` framesNumber
 appleSpawnTime :: Double
-appleSpawnTime = 0.2
+appleSpawnTime = 3
 pointsOnApple :: Int
 pointsOnApple = 1
 
@@ -143,7 +143,7 @@ update model (SpawnApple _) | playerState model == Playing =
           x = (mod rand1 framesNumber) * segSize + segSize `div` 2
           y = (mod rand2 framesNumber) * segSize + segSize `div` 2
           in
-          if V2 x y `elem` (snake model)
+          if elem (V2 x y) $ snake model ++ apples model
             then newApplePos gen2
             else (V2 x y, gen2)
         (newApple, newRandGen) = newApplePos $ randGen model
